@@ -33,7 +33,7 @@ There is no separate lint or test script in this initial Vite project. To verify
 
 ## Data and environment variables
 
-The current adapter is [src/data/schools.ts](./src/data/schools.ts), which contains clearly labeled demonstration records so the interface works offline. Replace it with an official education dataset or approved API integration before operational use. Keep school location data separate from public contact data, and only include institutional addresses published by the institution or an official dataset. Never add student, parent, private-personal, or consumer email addresses.
+The current adapter is [src/data/schools.ts](./src/data/schools.ts), which contains public institutional examples from official Dallas ISD and university pages so the interface works offline without exposing student or parent information. Replace it with an official education dataset or approved API integration before operational use. Keep school location data separate from public contact data, and only include institutional addresses published by the institution or an official dataset. Never add student, parent, private-personal, or consumer email addresses.
 
 Copy `.env.example` to `.env` when adding an approved data endpoint. `VITE_SCHOOL_DATA_URL` is reserved for that integration. Do not commit `.env` or API keys.
 
