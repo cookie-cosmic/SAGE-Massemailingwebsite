@@ -34,7 +34,14 @@ function toSchool(element: OverpassElement): School | undefined {
   const lat = element.lat ?? element.center?.lat
   const lng = element.lon ?? element.center?.lon
   if (!type || lat === undefined || lng === undefined || !tags.name) return undefined
-  const email = tags.email ?? tags['contact:email']
+  const email = [
+    tags.email,
+    tags['contact:email'],
+    tags['office:email'],
+    tags['operator:email'],
+    tags['admissions:email'],
+    tags['principal:email'],
+  ].find((value) => value?.trim())
   const website = tags.website ?? tags['contact:website'] ?? ''
   const address = [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' ') || 'Address not listed'
   return {

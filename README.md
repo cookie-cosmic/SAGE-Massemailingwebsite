@@ -33,7 +33,7 @@ There is no separate lint or test script in this initial Vite project. To verify
 
 ## Data and environment variables
 
-School discovery now uses the worldwide OpenStreetMap Overpass API through [src/services/schoolSearch.ts](./src/services/schoolSearch.ts). The map query is issued only when the user searches, so results are not hardcoded into the frontend and new mapped schools become available without rebuilding the website. OpenStreetMap records may include name, coordinates, address, website, country, and public email tags; an email is displayed only when it exists in the source data. Missing emails are not inferred or invented. Results depend on OpenStreetMap coverage and should be verified before operational outreach.
+School discovery now uses the worldwide OpenStreetMap Overpass API through [src/services/schoolSearch.ts](./src/services/schoolSearch.ts). The map query is issued only when the user searches, so results are not hardcoded into the frontend and new mapped schools become available without rebuilding the website. OpenStreetMap records may include name, coordinates, address, website, country, and public email tags. The adapter accepts school, office, operator, admissions, and principal role-contact email tags when they are explicitly published in the source. It does not scrape or infer individual teacher emails. When no public email is present, the result keeps the school website as the fallback contact path. Results depend on OpenStreetMap coverage and should be verified before operational outreach.
 
 Keep school location data separate from public contact data, and only include institutional addresses published by an approved source. Never add student, parent, private-personal, or consumer email addresses.
 
