@@ -3,8 +3,7 @@ import { Circle, MapContainer, Marker, Popup, TileLayer, useMapEvents } from 're
 import L from 'leaflet'
 import type { School, SchoolType } from './types'
 import { SCHOOL_TYPES } from './types'
-import { schools } from './data/schools'
-import { schoolsInRadius } from './utils/geo'
+import { searchWorldwideSchools } from './services/schoolSearch'
 import { exportCsv, exportTxt } from './utils/exports'
 
 const PASSWORD_HASH = '5fba196191c55421b988a5207d70bdb8ab6709a4ef59c184c2f588a39f02fc9a'
@@ -59,9 +58,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const selected = visibleResults.filter(({ school }) => selectedIds.includes(school.id))
   const emails = [...new Set(selected.map(({ school }) => school.email).filter((email): email is string => Boolean(email)))]
   const grouped = SCHOOL_TYPES.map((type) => ({ type, items: visibleResults.filter(({ school }) => school.type === type) })).filter(({ items }) => items.length)
-  const runSearch = () => {
-    setSearching(true); setSearched(false)
-    window.setTimeout(() => { setResults(schoolsInRadius(schools, center, radius)); setSelectedIds([]); setSearching(false); setSearched(true) }, 500)
+  const runSearch = async () => {
+    setSearching(true); setSearched(false); setNotice('')
+    try {
+      setResults(await searchWorldwideSchools(center, radius))
+      setSelectedIds([])
+      setSearched(true)
+    } catch (error) {
+      setResults([])
+      setSearched(true)
+      setNotice(error instanceof Error ? error.message : 'Worldwide school search failed')
+    } finally {
+      setSearching(false)
+    }
   }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Enter' && !['INPUT', 'TEXTAREA'].includes((event.target as HTMLElement).tagName)) runSearch() }
@@ -85,7 +94,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       </MapContainer>
       <div className="map-overlay"><div className="radius-display"><span>SEARCH RADIUS</span><strong>{radius.toFixed(1)} <small>miles</small></strong><input aria-label="Search radius" type="range" min="0.25" max="50" step="0.25" value={radius} onChange={(event) => setRadius(Number(event.target.value))} /></div><div className="map-hint"><span className="crosshair">⊕</span> Move cursor to position search area<br /><b>Press ENTER</b> or click search to find schools</div></div>
       <div className="floating-filters"><p className="panel-label">SCHOOL TYPES</p>{SCHOOL_TYPES.map((type) => <label key={type} className="check-row"><input type="checkbox" checked={selectedTypes.includes(type)} onChange={() => toggleType(type)} /><span className="custom-check" />{type}</label>)}<button className="search-button" onClick={runSearch}>{searching ? 'SEARCHING...' : 'SEARCH AREA'} <span>⌕</span></button></div>
-      {searched && <div className={`search-status ${results.length ? 'success' : 'empty'}`}><span>{results.length ? '✓' : '!'}</span><div><b>{results.length ? `${results.length} schools found` : 'No schools found in this area'}</b><small>{results.length ? `${new Set(results.map(({ school }) => school.email).filter(Boolean)).size} public emails available` : 'Try moving the search area or increasing the radius.'}</small></div></div>}
+      {searched && <div className={`search-status ${results.length ? 'success' : 'empty'}`}><span>{results.length ? '✓' : '!'}</span><div><b>{results.length ? `${results.length} schools found` : 'No schools found in this area'}</b><small>{results.length ? `${new Set(results.map(({ school }) => school.email).filter(Boolean)).size} public emails available · OpenStreetMap` : 'Try moving the search area or increasing the radius.'}</small></div></div>}
       {notice && <div className="toast">{notice}</div>}
     </section>
     <aside className="results-panel"><div className="results-heading"><div><p className="eyebrow">DIRECTORY SEARCH</p><h2>Search Results</h2></div><span className="result-count">{visibleResults.length}</span></div><div className="result-summary"><div><span>SCHOOLS FOUND</span><b>{visibleResults.length}</b></div><div><span>PUBLIC EMAILS</span><b>{new Set(visibleResults.map(({ school }) => school.email).filter(Boolean)).size}</b></div></div><div className="selection-actions"><button onClick={selectAll}>Select all</button><button onClick={() => setSelectedIds([])}>Deselect all</button></div><div className="cards">{grouped.map(({ type, items }) => <div className="school-group" key={type}><h3><span className="type-dot" style={{ background: markerColors[type] }} />{type}<em>{items.length}</em></h3>{items.map(({ school, distance }) => <article className={`school-card ${selectedIds.includes(school.id) ? 'selected' : ''}`} key={school.id} onClick={() => toggleSchool(school.id)}><input type="checkbox" checked={selectedIds.includes(school.id)} onChange={() => toggleSchool(school.id)} onClick={(event) => event.stopPropagation()} /><div className="school-info"><h4>{school.name}</h4><span className="school-type">{school.type}</span><p>{school.address}<br />{school.city}, {school.state} {school.zip}</p><div className="contact-line">{school.email ? <a href={`mailto:${school.email}`} onClick={(event) => event.stopPropagation()}>{school.email}</a> : <span className="no-email">No public email listed</span>}<a href={`https://${school.website}`} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{school.website} ↗</a></div><small className="distance">{distance.toFixed(1)} miles away</small></div></article>)}</div>)}</div><div className="email-dock"><div className="dock-title"><div><p className="eyebrow">SELECTED EMAILS</p><b>{emails.length} unique {emails.length === 1 ? 'address' : 'addresses'}</b></div><span className="email-badge">{selected.length} selected</span></div><div className="email-list">{emails.length ? emails.map((email) => <span key={email}>{email}</span>) : <span className="placeholder">Select schools to collect their public contacts</span>}</div><div className="export-actions"><button disabled={!emails.length} onClick={() => { navigator.clipboard.writeText(emails.join('\n')); notify(`Copied ${emails.length} email addresses.`) }}>Copy selected</button><button disabled={!selected.length} onClick={() => exportCsv(selected)}>Export CSV</button><button disabled={!emails.length} onClick={() => exportTxt(emails)}>Export TXT</button></div></div></aside>

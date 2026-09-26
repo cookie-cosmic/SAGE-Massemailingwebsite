@@ -12,6 +12,8 @@ export interface School {
   zip: string
   email?: string
   website: string
+  country?: string
+  source?: string
 }
 
 export const SCHOOL_TYPES: SchoolType[] = ['Elementary', 'Middle', 'High School', 'College / University']

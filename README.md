@@ -33,7 +33,9 @@ There is no separate lint or test script in this initial Vite project. To verify
 
 ## Data and environment variables
 
-The current adapter is [src/data/schools.ts](./src/data/schools.ts), which contains public institutional examples from official Dallas ISD and university pages so the interface works offline without exposing student or parent information. Replace it with an official education dataset or approved API integration before operational use. Keep school location data separate from public contact data, and only include institutional addresses published by the institution or an official dataset. Never add student, parent, private-personal, or consumer email addresses.
+School discovery now uses the worldwide OpenStreetMap Overpass API through [src/services/schoolSearch.ts](./src/services/schoolSearch.ts). The map query is issued only when the user searches, so results are not hardcoded into the frontend and new mapped schools become available without rebuilding the website. OpenStreetMap records may include name, coordinates, address, website, country, and public email tags; an email is displayed only when it exists in the source data. Missing emails are not inferred or invented. Results depend on OpenStreetMap coverage and should be verified before operational outreach.
+
+Keep school location data separate from public contact data, and only include institutional addresses published by an approved source. Never add student, parent, private-personal, or consumer email addresses.
 
 Copy `.env.example` to `.env` when adding an approved data endpoint. `VITE_SCHOOL_DATA_URL` is reserved for that integration. Do not commit `.env` or API keys.
 
@@ -56,5 +58,6 @@ The repository is configured for the `/SAGE-Massemailingwebsite/` base path. Pus
 
 - If the map is blank, check network access to OpenStreetMap tiles and browser console errors.
 - If a search returns no records, move the circle over the sample Dallas area or increase the radius.
+- OpenStreetMap searches require network access to an Overpass API endpoint. The client tries two public endpoints and reports an error if both are unavailable.
 - If clipboard copy is unavailable, use the TXT export; clipboard APIs require a secure context in many browsers.
 - If Pages assets 404, verify the repository name matches `SAGE-Massemailingwebsite` and that the Pages base path remains configured in `vite.config.ts`.
