@@ -62,8 +62,10 @@ export async function searchWorldwideSchools(center: { lat: number; lng: number 
   const query = buildQuery(center.lat, center.lng, radius)
   let lastError: unknown
   for (const endpoint of OVERPASS_ENDPOINTS) {
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 18000)
     try {
-      const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`)
+      const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, { signal: controller.signal })
       if (!response.ok) throw new Error(`OpenStreetMap search returned HTTP ${response.status}`)
       const payload = await response.json() as OverpassResponse
       const unique = new Map<string, { school: School; distance: number }>()
@@ -75,7 +77,11 @@ export async function searchWorldwideSchools(center: { lat: number; lng: number 
       }
       return [...unique.values()].sort((a, b) => a.distance - b.distance)
     } catch (error) {
-      lastError = error
+      lastError = error instanceof DOMException && error.name === 'AbortError'
+        ? new Error('The map data provider timed out. Try a smaller radius or search again.')
+        : error
+    } finally {
+      window.clearTimeout(timeout)
     }
   }
   throw lastError instanceof Error ? lastError : new Error('Worldwide school search is unavailable')
