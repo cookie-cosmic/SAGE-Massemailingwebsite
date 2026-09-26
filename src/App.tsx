@@ -64,7 +64,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const runSearch = async () => {
     setSearching(true); setSearched(false); setNotice('')
     try {
-      setResults(await searchWorldwideSchools(center, radius))
+      setResults(await searchWorldwideSchools(center, radius, emailOnly))
       setSelectedIds([])
       setSearched(true)
     } catch (error) {

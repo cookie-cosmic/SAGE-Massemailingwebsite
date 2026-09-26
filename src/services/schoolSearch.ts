@@ -15,6 +15,7 @@ type OverpassResponse = { elements?: OverpassElement[] }
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.nchc.org.tw/api/interpreter',
 ]
 
 function classify(tags: Record<string, string>): SchoolType | undefined {
@@ -53,36 +54,49 @@ function toSchool(element: OverpassElement): School | undefined {
   }
 }
 
-function buildQuery(lat: number, lng: number, radiusMiles: number) {
+function buildQuery(lat: number, lng: number, radiusMiles: number, emailOnly: boolean) {
   const radiusMeters = Math.round(radiusMiles * 1609.344)
-  return `[out:json][timeout:30];(nwr["amenity"~"school|college|university"](around:${radiusMeters},${lat},${lng});nwr["education"](around:${radiusMeters},${lat},${lng}););out center tags;`
+  const emailFilter = emailOnly ? '["email"]' : ''
+  return `[out:json][timeout:8];nwr["amenity"~"school|college|university"]${emailFilter}(around:${radiusMeters},${lat},${lng});out center tags;`
 }
 
-export async function searchWorldwideSchools(center: { lat: number; lng: number }, radius: number) {
-  const query = buildQuery(center.lat, center.lng, radius)
-  let lastError: unknown
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    const controller = new AbortController()
-    const timeout = window.setTimeout(() => controller.abort(), 18000)
-    try {
-      const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, { signal: controller.signal })
+export async function searchWorldwideSchools(center: { lat: number; lng: number }, radius: number, emailOnly = false) {
+  const query = buildQuery(center.lat, center.lng, radius, emailOnly)
+  const controllers = OVERPASS_ENDPOINTS.map(() => new AbortController())
+  const deadline = window.setTimeout(() => controllers.forEach((controller) => controller.abort()), 1900)
+  const requests = OVERPASS_ENDPOINTS.map((endpoint, index) =>
+    fetch(endpoint, {
+      method: 'POST',
+      body: query,
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      signal: controllers[index].signal,
+    }).then(async (response) => {
       if (!response.ok) throw new Error(`OpenStreetMap search returned HTTP ${response.status}`)
-      const payload = await response.json() as OverpassResponse
-      const unique = new Map<string, { school: School; distance: number }>()
-      for (const element of payload.elements ?? []) {
-        const school = toSchool(element)
-        if (!school) continue
-        const distance = distanceMiles(center.lat, center.lng, school.lat, school.lng)
-        if (distance <= radius && !unique.has(school.name.toLowerCase())) unique.set(school.name.toLowerCase(), { school, distance })
-      }
-      return [...unique.values()].sort((a, b) => a.distance - b.distance)
-    } catch (error) {
-      lastError = error instanceof DOMException && error.name === 'AbortError'
-        ? new Error('The map data provider timed out. Try a smaller radius or search again.')
-        : error
-    } finally {
-      window.clearTimeout(timeout)
+      return response.json() as Promise<OverpassResponse>
+    }),
+  )
+  try {
+    const payload = await new Promise<OverpassResponse>((resolve, reject) => {
+      let failures = 0
+      let lastError: unknown
+      requests.forEach((request) => request.then(resolve).catch((error: unknown) => {
+        failures += 1
+        lastError = error
+        if (failures === requests.length) reject(lastError)
+      }))
+    })
+    const unique = new Map<string, { school: School; distance: number }>()
+    for (const element of payload.elements ?? []) {
+      const school = toSchool(element)
+      if (!school) continue
+      const distance = distanceMiles(center.lat, center.lng, school.lat, school.lng)
+      if (distance <= radius && !unique.has(school.name.toLowerCase())) unique.set(school.name.toLowerCase(), { school, distance })
     }
+    return [...unique.values()].sort((a, b) => a.distance - b.distance)
+  } catch {
+    throw new Error('The worldwide data providers did not respond within 2 seconds. Try a smaller radius or search again.')
+  } finally {
+    window.clearTimeout(deadline)
+    controllers.forEach((controller) => controller.abort())
   }
-  throw lastError instanceof Error ? lastError : new Error('Worldwide school search is unavailable')
 }
